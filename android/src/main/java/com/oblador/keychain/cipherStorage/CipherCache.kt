@@ -11,7 +11,6 @@ import javax.crypto.NoSuchPaddingException
  */
 object CipherCache {
     private val LOG_TAG = CipherCache::class.java.simpleName
-    
     private val cipherCache = ThreadLocal<MutableMap<String, Cipher>>()
 
     /**
