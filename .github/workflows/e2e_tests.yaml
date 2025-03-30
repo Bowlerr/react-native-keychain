@@ -146,7 +146,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          avd-name: Medium_Phone_API_35
+          avd-name: TestingAVD
           script: |
             cd KeychainExample
             yarn test:android:run
