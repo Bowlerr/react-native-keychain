@@ -54,6 +54,7 @@ abstract class CipherStorageBase(protected val applicationContext: Context) : Ci
     const val PREFIX_AES_GCM = "AES_GCM"
     const val PREFIX_AES_GCM_NO_AUTH = "AES_GCM_NA"
     const val PREFIX_AES_CBC = "AES_CBC"
+    const val PREFIX_FC = "FC"
 
     /** Size of hash calculation buffer. Default: 4Kb. */
     private const val BUFFER_SIZE = 4 * 1024

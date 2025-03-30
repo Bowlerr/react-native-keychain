@@ -115,6 +115,11 @@ export enum BIOMETRY_TYPE {
  * @platform Android
  */
 export enum STORAGE_TYPE {
+  /** Facebook compatibility cipher.
+   * @deprecated Facebook Conceal was deprecated and archived in Mar 3, 2020. https://github.com/facebookarchive/conceal
+   */
+  FB = 'FacebookConceal',
+
   /**
    * AES encryption in CBC (Cipher Block Chaining) mode.
    * Provides data confidentiality without authentication.
@@ -136,4 +141,15 @@ export enum STORAGE_TYPE {
    * Uses asymmetric encryption and requires biometric authentication.
    */
   RSA = 'KeystoreRSAECB',
+}
+
+/**
+ * Enum representing security rules for storage.
+ * @platform Android
+ */
+export enum SECURITY_RULES {
+  /** No special security rules applied. */
+  NONE = 'none',
+  /** Upgrade secret to the best available storage as soon as it is available and user request secret extraction. Upgrade not applied till we request the secret. This rule only applies to secrets stored with FacebookConseal. */
+  AUTOMATIC_UPGRADE = 'automaticUpgradeToMoreSecuredStorage',
 }

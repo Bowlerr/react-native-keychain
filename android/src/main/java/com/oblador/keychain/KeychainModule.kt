@@ -17,6 +17,7 @@ import com.oblador.keychain.cipherStorage.CipherCache
 import com.oblador.keychain.cipherStorage.CipherStorage
 import com.oblador.keychain.cipherStorage.CipherStorage.DecryptionResult
 import com.oblador.keychain.cipherStorage.CipherStorageBase
+import com.oblador.keychain.cipherStorage.CipherStorageFacebookConceal
 import com.oblador.keychain.cipherStorage.CipherStorageKeystoreAesCbc
 import com.oblador.keychain.cipherStorage.CipherStorageKeystoreAesGcm
 import com.oblador.keychain.cipherStorage.CipherStorageKeystoreRsaEcb
@@ -103,9 +104,13 @@ class KeychainModule(reactContext: ReactApplicationContext) :
   }
 
   /** Supported ciphers. */
-  @StringDef(KnownCiphers.AES_CBC, KnownCiphers.AES_GCM, KnownCiphers.RSA)
+  @StringDef(KnownCiphers.FB, KnownCiphers.AES_CBC, KnownCiphers.AES_GCM, KnownCiphers.RSA)
   annotation class KnownCiphers {
     companion object {
+
+      /** Facebook conceal compatibility lib in use. */
+      const val FB = "FacebookConceal"
+
       /** AES CBC encryption. */
       const val AES_CBC = "KeystoreAESCBC"
 
@@ -119,6 +124,17 @@ class KeychainModule(reactContext: ReactApplicationContext) :
       const val RSA = "KeystoreRSAECB"
     }
   }
+
+
+  /** Secret manipulation rules. */
+  @StringDef(Rules.AUTOMATIC_UPGRADE, Rules.NONE)
+  internal annotation class Rules {
+    companion object {
+      const val NONE = "none"
+      const val AUTOMATIC_UPGRADE = "automaticUpgradeToMoreSecuredStorage"
+    }
+  }
+
 
   // endregion
   // region Members
@@ -139,6 +155,7 @@ class KeychainModule(reactContext: ReactApplicationContext) :
   /** Default constructor. */
   init {
     prefsStorage = DataStorePrefsStorage(reactContext, coroutineScope)
+    addCipherStorageToMap(CipherStorageFacebookConceal(reactContext))
     addCipherStorageToMap(CipherStorageKeystoreAesCbc(reactContext))
     addCipherStorageToMap(CipherStorageKeystoreAesGcm(reactContext, false))
     addCipherStorageToMap(CipherStorageKeystoreAesGcm(reactContext, true))
@@ -253,14 +270,29 @@ class KeychainModule(reactContext: ReactApplicationContext) :
             return@launch
           }
           val storageName = resultSet.cipherStorageName
+          val rules = getSecurityRulesOrDefault(options);
           val accessControl = getAccessControlOrDefault(options)
           val usePasscode = getUsePasscode(accessControl) && isPasscodeAvailable
           val useBiometry =
             getUseBiometry(accessControl) && (isFingerprintAuthAvailable || isFaceAuthAvailable || isIrisAuthAvailable)
           val promptInfo = getPromptInfo(options, usePasscode, useBiometry)
-          val cipher = getCipherStorageByName(storageName)
-          val decryptionResult =
-            decryptCredentials(alias, cipher!!, resultSet, promptInfo)
+          var cipher: CipherStorage? = null
+
+          // Only check for upgradable ciphers for FacebookConseal as that
+          // is the only cipher that can be upgraded
+          cipher =
+            if (rules == Rules.AUTOMATIC_UPGRADE && storageName == KnownCiphers.FB) {
+              // get the best storage
+              val accessControl = getAccessControlOrDefault(options)
+              val usePasscode = getUsePasscode(accessControl) && isPasscodeAvailable
+              val useBiometry =
+                getUseBiometry(accessControl) && (isFingerprintAuthAvailable || isFaceAuthAvailable || isIrisAuthAvailable)
+              getCipherStorageForCurrentAPILevel(useBiometry, usePasscode)
+            } else {
+              getCipherStorageByName(storageName)
+            }
+          val decryptionResult = decryptCredentials(alias, cipher!!, resultSet, rules, promptInfo)
+
           val credentials = Arguments.createMap()
           credentials.putString(Maps.SERVICE, alias)
           credentials.putString(Maps.USERNAME, decryptionResult.username)
@@ -447,6 +479,7 @@ class KeychainModule(reactContext: ReactApplicationContext) :
     alias: String,
     current: CipherStorage,
     resultSet: PrefsStorageBase.ResultSet,
+    @Rules rules: String,
     promptInfo: PromptInfo
   ): DecryptionResult {
     val storageName = resultSet.cipherStorageName
@@ -468,6 +501,17 @@ class KeychainModule(reactContext: ReactApplicationContext) :
 
     // decrypt using the older cipher storage
     val decryptionResult = decryptToResult(alias, oldStorage, resultSet, promptInfo)
+    if (Rules.AUTOMATIC_UPGRADE == rules) {
+      try {
+        // encrypt using the current cipher storage
+        migrateCipherStorage(alias, current, oldStorage, decryptionResult, promptInfo)
+      } catch (e: CryptoFailedException) {
+        Log.w(
+          KEYCHAIN_MODULE, "Migrating to a less safe storage is not allowed. Keeping the old one"
+        )
+      }
+    }
+
     return decryptionResult
   }
 
@@ -668,6 +712,24 @@ class KeychainModule(reactContext: ReactApplicationContext) :
       }
       return getAliasOrDefault(service)
     }
+
+
+    /** Get automatic secret manipulation rules, default: No upgrade. */
+    @Rules
+    private fun getSecurityRulesOrDefault(options: ReadableMap?): String {
+      return getSecurityRulesOrDefault(options, Rules.NONE)
+    }
+
+    /** Get automatic secret manipulation rules. */
+    @Rules
+    private fun getSecurityRulesOrDefault(options: ReadableMap?, @Rules rule: String): String {
+      var rules: String? = null
+      if (null != options && options.hasKey(Maps.RULES)) {
+        rules = options.getString(Maps.RULES)
+      }
+      return rules ?: rule
+    }
+
 
     /** Extract user specified storage from options. */
     @KnownCiphers
