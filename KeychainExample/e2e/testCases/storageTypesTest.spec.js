@@ -1,12 +1,53 @@
-import { by, device, element, expect, waitFor } from 'detox';
-import { matchLoadInfo } from '../utils/matchLoadInfo';
+import { by, element, expect, device } from 'detox';
 import { enterBiometrics, waitForAuthValidity } from '../utils/authHelpers';
+
+import {
+  expectCredentialsLoadedMessage,
+  expectCredentialsSavedMessage,
+  expectCredentialsResetMessage,
+} from '../utils/statusMessageHelpers';
 
 describe(':android:Storage Types', () => {
   beforeEach(async () => {
     await device.launchApp({ newInstance: true });
   });
   ['genericPassword', 'internetCredentials'].forEach((type) => {
+    it(
+      ':android:should save with FB storage and migrate it to AES_GCM_NO_AUTH - ' +
+        type,
+      async () => {
+        await expect(element(by.text('Keychain Example'))).toExist();
+        await element(by.id('usernameInput')).typeText('testUsernameFB');
+        await element(by.id('passwordInput')).typeText('testPasswordFB');
+        // Hide keyboard
+        await element(by.text('Keychain Example')).tap();
+
+        await element(by.text(type)).tap();
+        await element(by.text('None')).tap();
+        await element(by.text('No upgrade')).tap();
+        await element(by.text('FB')).tap();
+
+        await expect(element(by.text('Save'))).toBeVisible();
+        await element(by.text('Save')).tap();
+        await expectCredentialsSavedMessage();
+        await element(by.text('Load')).tap();
+        await expectCredentialsLoadedMessage(
+          'testUsernameFB',
+          'testPasswordFB',
+          'FacebookConceal',
+          type === 'internetCredentials' ? 'https://example.com' : undefined
+        );
+        await element(by.text('Automatic upgrade')).tap();
+        await element(by.text('Load')).tap();
+        await expectCredentialsLoadedMessage(
+          'testUsernameFB',
+          'testPasswordFB',
+          'KeystoreAESGCM_NoAuth',
+          type === 'internetCredentials' ? 'https://example.com' : undefined
+        );
+      }
+    );
+
     it(':android:should save with AES_CBC storage - ' + type, async () => {
       await expect(element(by.text('Keychain Example'))).toExist();
       await element(by.id('usernameInput')).typeText('testUsernameAESCBC');
@@ -20,11 +61,9 @@ describe(':android:Storage Types', () => {
 
       await expect(element(by.text('Save'))).toBeVisible();
       await element(by.text('Save')).tap();
-      await waitFor(element(by.text(/^Credentials saved! .*$/)))
-        .toExist()
-        .withTimeout(3000);
+      await expectCredentialsSavedMessage();
       await element(by.text('Load')).tap();
-      await matchLoadInfo(
+      await expectCredentialsLoadedMessage(
         'testUsernameAESCBC',
         'testPasswordAESCBC',
         'KeystoreAESCBC',
@@ -46,13 +85,11 @@ describe(':android:Storage Types', () => {
       await expect(element(by.text('Save'))).toBeVisible();
       await element(by.text('Save')).tap();
       await enterBiometrics();
-      await waitFor(element(by.text(/^Credentials saved! .*$/)))
-        .toExist()
-        .withTimeout(3000);
+      await expectCredentialsSavedMessage();
       await waitForAuthValidity();
       await element(by.text('Load')).tap();
       await enterBiometrics();
-      await matchLoadInfo(
+      await expectCredentialsLoadedMessage(
         'testUsernameAESGCM',
         'testPasswordAESGCM',
         'KeystoreAESGCM',
@@ -79,11 +116,9 @@ describe(':android:Storage Types', () => {
 
         await expect(element(by.text('Save'))).toBeVisible();
         await element(by.text('Save')).tap();
-        await waitFor(element(by.text(/^Credentials saved! .*$/)))
-          .toExist()
-          .withTimeout(3000);
+        await expectCredentialsSavedMessage();
         await element(by.text('Load')).tap();
-        await matchLoadInfo(
+        await expectCredentialsLoadedMessage(
           'testUsernameAESGCMNoAuth',
           'testPasswordAESGCMNoAuth',
           'KeystoreAESGCM_NoAuth',
@@ -105,15 +140,10 @@ describe(':android:Storage Types', () => {
 
       await expect(element(by.text('Save'))).toBeVisible();
       await element(by.text('Save')).tap();
-      await waitFor(element(by.text(/^Credentials saved! .*$/)))
-        .toExist()
-        .withTimeout(5000);
+      await expectCredentialsSavedMessage();
       await element(by.text('Load')).tap();
       await enterBiometrics();
-      await waitFor(element(by.text(/^Credentials loaded! .*$/)))
-        .toExist()
-        .withTimeout(5000);
-      await matchLoadInfo(
+      await expectCredentialsLoadedMessage(
         'testUsernameRSA',
         'testPasswordRSA',
         'KeystoreRSAECB',
@@ -127,6 +157,6 @@ describe(':android:Storage Types', () => {
     // Hide keyboard
 
     await element(by.text('Reset')).tap();
-    await expect(element(by.text(/^Credentials Reset!$/))).toExist();
+    await expectCredentialsResetMessage();
   });
 });

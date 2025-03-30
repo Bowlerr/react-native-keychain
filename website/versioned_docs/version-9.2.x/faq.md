@@ -17,7 +17,7 @@ title: Frequently Asked Questions
 
 **Q: Is it possible to implement automatic downgrading?**
 
-**A:** From a security perspective, automatic downgrading is considered a "loss of trust." Developers should implement their own logic to allow downgrades and handle the "security loss" accordingly. 
+**A:** From a security perspective, automatic downgrading is considered a "loss of trust." Developers should implement their own logic to allow downgrades and handle the "security loss" accordingly.
 
 > **Recommendation:** Avoid implementing automatic downgrades.
 
@@ -25,10 +25,10 @@ title: Frequently Asked Questions
 
 **Q: How do I enable automatic upgrades for Facebook Conceal?**
 
-**A:** Use the following call:
+**A:** Facebook Conceal remains supported for legacy reasons. To automatically upgrade to a stronger storage (if available), use:
 
 ```tsx
-getGenericPassword({ ...otherProps, rules: "AUTOMATIC_UPGRADE" });
+getGenericPassword({ ...otherProps, rules: 'AUTOMATIC_UPGRADE' });
 ```
 
 Ensure the `rules` property is set to the string value `AUTOMATIC_UPGRADE`.
@@ -40,7 +40,7 @@ Ensure the `rules` property is set to the string value `AUTOMATIC_UPGRADE`.
 **A:** To force a specific encryption level, call:
 
 ```tsx
-setGenericPassword({ ...otherProps, storage: "AES_GCM_NO_AUTH" });
+setGenericPassword({ ...otherProps, storage: 'AES_GCM_NO_AUTH' });
 ```
 
 > **Note:** If you attempt to force `RSA` storage when biometrics are not available, the call will be rejected with an error related to the device's biometric configuration.
